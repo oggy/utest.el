@@ -1,0 +1,155 @@
+;;;; Support ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro tester:defstruct (name &rest attributes)
+  `(tester:define-struct ',name ',attributes))
+
+(defun tester:define-struct (name attributes)
+  (tester:define-constructor name attributes)
+  (mapc (lambda (attribute)
+          (tester:define-getter name attribute)
+          (tester:define-setter name attribute)
+          (tester:define-adder  name attribute))
+        attributes))
+
+(defun tester:define-constructor (name attributes)
+  (let ((constructor-name (intern (concat "tester:make-" (symbol-name name))))
+        (assignments (mapcar (lambda (attribute)
+                               `(puthash ',attribute ,attribute table))
+                             attributes)))
+    (eval `(defun ,constructor-name (&optional ,@attributes)
+             (let ((table (make-hash-table)))
+               ,@assignments
+               table)))))
+
+(defun tester:define-getter (struct attribute)
+  (let ((getter (intern (concat "tester:" (symbol-name struct) "-" (symbol-name attribute)))))
+    (eval `(defun ,getter (self)
+       (gethash ',attribute self)))))
+
+(defun tester:define-setter (struct attribute)
+  (let ((setter (intern (concat "tester:set-" (symbol-name struct) "-" (symbol-name attribute)))))
+    (eval `(defun ,setter (self value)
+       (puthash ',attribute value self)))))
+
+(defun tester:define-adder (struct attribute)
+  (let ((setter (intern (concat "tester:add-to-" (symbol-name struct) "-" (symbol-name attribute)))))
+    (eval `(defun ,setter (self value)
+       (puthash ',attribute (cons value (gethash ',attribute self)) self)))))
+
+;;;; Test structures ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tester:defstruct scene name wrappers tests)
+(tester:defstruct test scene name function result)
+
+(defvar tester:scenes nil
+  "List of all test scenes defined.")
+
+(defun tester:make-wrapper (args forms)
+  (eval `(lambda ,args ,@(tester:make-wrapper-expand-run-calls forms))))
+
+(defun tester:make-wrapper-expand-run-calls (forms)
+  (mapcar (lambda (form)
+            (if (listp form)
+                (if (equal form '(run))
+                    '(funcall run)
+                  (tester:make-wrapper-expand-run-calls form))
+              form))
+          forms))
+
+(defmacro scene (name &rest forms)
+  `(tester:define-scene ',name ',forms))
+
+(defun tester:define-scene (name forms)
+  (let ((scene (tester:make-scene)))
+    (tester:set-scene-name scene name)
+    (mapc (lambda (form)
+            (case (car form)
+              ('test
+               (let ((test (tester:make-test)) function)
+                 (tester:set-test-scene test scene)
+                 (tester:set-test-name test (nth 1 form))
+                 (setq function (eval `(lambda () ,@(cddr form))))
+                 (tester:set-test-function test function)
+                 (tester:add-to-scene-tests scene test)))
+              ('wrap
+               (let ((wrapper (tester:make-wrapper () (cdr form))))
+                 (tester:add-to-scene-wrappers scene wrapper)))
+              ('setup
+               (let ((wrapper (tester:make-wrapper () (append (copy-list (cdr form)) (list '(run))))))
+                 (tester:add-to-scene-wrappers scene wrapper)))
+              ('teardown
+               (let ((wrapper (tester:make-wrapper (cons '(run) (copy-list (cdr form))))))
+                 (tester:add-to-scene-wrappers scene wrapper)))))
+          forms)
+    (add-to-list 'tester:scenes scene)))
+
+;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; NOTE: since emacs lisp only does dynamic binding, all locals and
+;; function parameters in this section need to be prefixed with
+;; 'tester:' so they do not affect client code.
+
+(defun tester:run ()
+  "Run all tests.
+
+This runs the tests and prints the results to `standard-output'.
+
+To run the tests from a command line, do:
+
+  emacs -batch -l tester.el -l <test-file> ... -f tester:run"
+  (mapc (lambda (tester:current-scene)
+          (mapc (lambda (tester:current-test)
+                  (tester:run-current-test))
+                (tester:scene-tests tester:current-scene)))
+        tester:scenes))
+
+(defun tester:run-current-test ()
+  (condition-case e
+      (progn
+        (tester:run-current-test-with-wrappers
+         (tester:test-function tester:current-test)
+         (tester:scene-wrappers tester:current-scene))
+        (tester:test-passed tester:current-test))
+    ('error (tester:test-failed tester:current-test) t)))
+
+(defun tester:test-passed (test)
+  (insert "."))
+
+(defun tester:test-failed (test)
+  (insert "X"))
+
+(defun tester:run-current-test-with-wrappers (run tester:wrappers)
+  (if (null tester:wrappers)
+      (funcall run)
+    (let* ((tester:outer-run run)
+           (run (lambda () (tester:run-current-test-with-wrappers
+                            tester:outer-run (cdr tester:wrappers)))))
+      (funcall (car tester:wrappers)))))
+
+(defun tester:wrap-current-test (run tester:wrappers)
+  (if (null tester:wrappers)
+      run
+    (let ((tester:outer-run run)
+          (run (car tester:wrappers)))
+      (funcall tester:outer-run))))
+
+;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(provide 'tester)
+
+;;;; Example ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(setq tester:scenes nil)
+(scene "name of scene"
+       (wrap (insert "[") (run) (insert "]"))
+       (wrap (insert "(") (run) (insert ")"))
+
+       (test "name of test" (assert t))
+       (test "name of other test" (assert nil)))
+
+(setq evalling-buffer t)
+(let ((evalling-buffer (if (boundp 'evalling-buffer) evalling-buffer nil)))
+  (unless evalling-buffer
+    (eval-buffer)
+    (goto-char (point-max))
+    (tester:run)))

@@ -106,6 +106,7 @@ To run the tests from a command line, do:
 
   emacs -batch -l tester.el -l <test-file> ... -f tester:run"
   (mapc (lambda (tester:current-scene)
+          (message "\e[1m  * %s\e[0m" (tester:scene-name tester:current-scene))
           (mapc (lambda (tester:current-test)
                   (tester:run-current-test))
                 (tester:scene-tests tester:current-scene)))
@@ -138,15 +139,15 @@ To run the tests from a command line, do:
 
 (defun tester:test-passed ()
   (tester:set-test-result tester:current-test 'pass)
-  (message "[0;32m  * PASS: %s[0m" (tester:test-name tester:current-test)))
+  (message "\e[0;32m    - %s\e[0m" (tester:test-name tester:current-test)))
 
 (defun tester:test-failed ()
   (tester:set-test-result tester:current-test 'fail)
-  (message "[0;31m  * FAIL: %s[0m" (tester:test-name tester:current-test)))
+  (message "\e[0;31m    - %s -- FAIL!\e[0m" (tester:test-name tester:current-test)))
 
 (defun tester:test-erred ()
   (tester:set-test-result tester:current-test 'error)
-  (message "[0;31m  * ERROR: %s[0m" (tester:test-name tester:current-test)))
+  (message "\e[0;31m    - %s -- ERROR!\e[0m" (tester:test-name tester:current-test)))
 
 ;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

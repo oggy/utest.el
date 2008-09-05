@@ -138,15 +138,15 @@ To run the tests from a command line, do:
 
 (defun tester:test-passed ()
   (tester:set-test-result tester:current-test 'pass)
-  (message "."))
+  (message "[0;32m  * PASS: %s[0m" (tester:test-name tester:current-test)))
 
 (defun tester:test-failed ()
   (tester:set-test-result tester:current-test 'fail)
-  (message "F"))
+  (message "[0;31m  * FAIL: %s[0m" (tester:test-name tester:current-test)))
 
 (defun tester:test-erred ()
   (tester:set-test-result tester:current-test 'error)
-  (message "E"))
+  (message "[0;31m  * ERROR: %s[0m" (tester:test-name tester:current-test)))
 
 ;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -157,8 +157,10 @@ To run the tests from a command line, do:
 (scene "name of scene"
        (wrap (run))
        (wrap (run))
-       (test "name of test" (check t))
-       (test "name of other test" (check nil)))
+       (test "failing test" (check t))
+       (test "passing test" (check nil))
+       (test "erring test" (wibble))
+       )
 
 ;; To run:
 ;;   $ emacs -Q -batch -l tester.el -f tester:run

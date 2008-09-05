@@ -1,3 +1,5 @@
+(require 'cl)
+
 ;;;; Support ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro tester:defstruct (name &rest attributes)
@@ -136,15 +138,15 @@ To run the tests from a command line, do:
 
 (defun tester:test-passed ()
   (tester:set-test-result tester:current-test 'pass)
-  (insert "."))
+  (message "."))
 
 (defun tester:test-failed ()
   (tester:set-test-result tester:current-test 'fail)
-  (insert "F"))
+  (message "F"))
 
 (defun tester:test-erred ()
   (tester:set-test-result tester:current-test 'error)
-  (insert "E"))
+  (message "E"))
 
 ;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -152,17 +154,11 @@ To run the tests from a command line, do:
 
 ;;;; Example ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(setq tester:scenes nil)
 (scene "name of scene"
-       (wrap (insert "[") (run) (insert "]"))
-       (wrap (insert "(") (run) (insert ")"))
-
+       (wrap (run))
+       (wrap (run))
        (test "name of test" (check t))
        (test "name of other test" (check nil)))
 
-(setq evalling-buffer t)
-(let ((evalling-buffer (if (boundp 'evalling-buffer) evalling-buffer nil)))
-  (unless evalling-buffer
-    (eval-buffer)
-    (goto-char (point-max))
-    (tester:run)))
+;; To run:
+;;   $ emacs -Q -batch -l tester.el -f tester:run

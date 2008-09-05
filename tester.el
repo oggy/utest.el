@@ -83,6 +83,12 @@
           forms)
     (add-to-list 'tester:scenes scene)))
 
+(defmacro check (form)
+  `(or ,form
+       (signal 'tester:failed nil)))
+
+(put 'tester:failed 'error-conditions '(tester:failed error))
+
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; NOTE: since emacs lisp only does dynamic binding, all locals and
@@ -104,34 +110,41 @@ To run the tests from a command line, do:
         tester:scenes))
 
 (defun tester:run-current-test ()
-  (condition-case e
-      (progn
-        (tester:run-current-test-with-wrappers
-         (tester:test-function tester:current-test)
-         (tester:scene-wrappers tester:current-scene))
-        (tester:test-passed tester:current-test))
-    ('error (tester:test-failed tester:current-test) t)))
-
-(defun tester:test-passed (test)
-  (insert "."))
-
-(defun tester:test-failed (test)
-  (insert "X"))
+  (tester:run-current-test-with-wrappers
+   (tester:test-function tester:current-test)
+   (tester:scene-wrappers tester:current-scene))
+  (unless (tester:test-result tester:current-test)
+    (tester:test-passed)))
 
 (defun tester:run-current-test-with-wrappers (run tester:wrappers)
   (if (null tester:wrappers)
-      (funcall run)
+      (tester:call-safely run)
     (let* ((tester:outer-run run)
            (run (lambda () (tester:run-current-test-with-wrappers
                             tester:outer-run (cdr tester:wrappers)))))
-      (funcall (car tester:wrappers)))))
+      (tester:call-safely (car tester:wrappers)))))
 
-(defun tester:wrap-current-test (run tester:wrappers)
-  (if (null tester:wrappers)
-      run
-    (let ((tester:outer-run run)
-          (run (car tester:wrappers)))
-      (funcall tester:outer-run))))
+(defun tester:call-safely (function)
+    (condition-case e
+        (funcall function)
+      (tester:failed
+       (unless (tester:test-result tester:current-test)
+         (tester:test-failed)))
+      (error
+       (unless (tester:test-result tester:current-test)
+         (tester:test-erred)))))
+
+(defun tester:test-passed ()
+  (tester:set-test-result tester:current-test 'pass)
+  (insert "."))
+
+(defun tester:test-failed ()
+  (tester:set-test-result tester:current-test 'fail)
+  (insert "F"))
+
+(defun tester:test-erred ()
+  (tester:set-test-result tester:current-test 'error)
+  (insert "E"))
 
 ;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -144,8 +157,8 @@ To run the tests from a command line, do:
        (wrap (insert "[") (run) (insert "]"))
        (wrap (insert "(") (run) (insert ")"))
 
-       (test "name of test" (assert t))
-       (test "name of other test" (assert nil)))
+       (test "name of test" (check t))
+       (test "name of other test" (check nil)))
 
 (setq evalling-buffer t)
 (let ((evalling-buffer (if (boundp 'evalling-buffer) evalling-buffer nil)))

@@ -112,7 +112,7 @@ To run the tests from a command line, do:
 (defun tester:run-current-test ()
   (tester:run-current-test-with-wrappers
    (tester:test-function tester:current-test)
-   (tester:scene-wrappers tester:current-scene))
+   (reverse (tester:scene-wrappers tester:current-scene)))
   (unless (tester:test-result tester:current-test)
     (tester:test-passed)))
 

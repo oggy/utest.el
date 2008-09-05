@@ -158,8 +158,8 @@ To run the tests from a command line, do:
 (scene "name of scene"
        (wrap (run))
        (wrap (run))
-       (test "failing test" (check t))
-       (test "passing test" (check nil))
+       (test "passing test" (check t))
+       (test "failing test" (check nil))
        (test "erring test" (wibble))
        )
 

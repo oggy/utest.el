@@ -32,8 +32,8 @@
        (puthash ',attribute value self)))))
 
 (defun tester:define-adder (struct attribute)
-  (let ((setter (intern (concat "tester:add-to-" (symbol-name struct) "-" (symbol-name attribute)))))
-    (eval `(defun ,setter (self value)
+  (let ((adder (intern (concat "tester:add-to-" (symbol-name struct) "-" (symbol-name attribute)))))
+    (eval `(defun ,adder (self value)
        (puthash ',attribute (cons value (gethash ',attribute self)) self)))))
 
 ;;;; Test structures ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -42,17 +42,17 @@
 (tester:defstruct test scene name function result)
 
 (defvar tester:scenes nil
-  "List of all test scenes defined.")
+  "List of all test scenes.")
 
 (defun tester:make-wrapper (args forms)
-  (eval `(lambda ,args ,@(tester:make-wrapper-expand-run-calls forms))))
+  (eval `(lambda ,args ,@(tester:expand-run-calls forms))))
 
-(defun tester:make-wrapper-expand-run-calls (forms)
+(defun tester:expand-run-calls (forms)
   (mapcar (lambda (form)
             (if (listp form)
                 (if (equal form '(run))
                     '(funcall run)
-                  (tester:make-wrapper-expand-run-calls form))
+                  (tester:expand-run-calls form))
               form))
           forms))
 

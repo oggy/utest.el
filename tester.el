@@ -85,11 +85,40 @@
           forms)
     (add-to-list 'tester:scenes scene)))
 
+;;;; Test library
+
 (defmacro check (form)
   `(or ,form
        (signal 'tester:failed nil)))
 
 (put 'tester:failed 'error-conditions '(tester:failed error))
+
+(defun tester:select (&optional start end)
+  "Highlight the region between START and END in the selected buffer.
+
+If START is nil, it defaults to (point-min); if END is nil, it
+defaults to (point-max).
+
+If either START or END are less than or equal to zero, it means
+that many places from the end of the buffer.  For example, 0
+means (point-max), and -1 means (1- (point-max)).  (Recall that
+the beginning of the buffer is position 1.)
+
+After calling this function, `region-exists-p' will return true.
+Note that when evaluating a call to this function via
+`eval-last-sexp` or similar, the region may not remain
+highlighted, as it is deactivated before `eval-last-sexp`
+returns."
+  (when (null start)
+    (setq start (point-min)))
+  (when (null end)
+    (setq end (point-max)))
+  (when (<= 0 start)
+    (incf start (point-max)))
+  (when (<= 0 end)
+    (incf end (point-max)))
+  (set-mark start)
+  (goto-char end))
 
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

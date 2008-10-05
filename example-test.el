@@ -15,11 +15,11 @@
               (test "using x and z" (check (= (+ x z) 4))))
 
        (test "using buffer one"
-             (tester:in-buffer one
+             (tester:in-buffer "one"
                                (check (string= (buffer-string) "hi\n"))
                                (check (= (point) 1))))
        (test "using buffer two"
-             (tester:in-buffer two
+             (tester:in-buffer "two"
                                (check (string= (buffer-string) "bye\n"))
                                (check (= (point) 4))))
        (buffers "

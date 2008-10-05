@@ -121,7 +121,7 @@
       (while (not (eobp))
         (let (name spec)
           (tester:skip-whitespace)
-          (setq name (intern (buffer-substring (point) (point-at-eol))))
+          (setq name (buffer-substring (point) (point-at-eol)))
           (if (eq (forward-line) 0)
               (let (start end)
                 (setq start (point))

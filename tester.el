@@ -204,6 +204,13 @@ the beginning of the buffer is position 1.)"
          (goto-char (point-min)))
        ,@forms)))
 
+(defun tester:inspect-buffer ()
+  (message (make-string 70 ?=))
+  (message "%s-!-%s"
+           (buffer-substring (point-min) (point))
+           (buffer-substring (point) (point-max)))
+  (message (make-string 70 ?=)))
+
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; NOTE: since emacs lisp only does dynamic binding, all locals and

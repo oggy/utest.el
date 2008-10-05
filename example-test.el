@@ -4,9 +4,13 @@
 (require 'tester)
 
 (scene "name of scene"
-       (wrap (run))
-       (wrap (run))
-       (test "passing test" (check t))
+       (wrap (let ((x 1)) (run)))
+       (wrap (let ((y 2)) (run)))
+       (test "passing test" (check (= (+ x y) 3)))
        (test "failing test" (check nil))
        (test "erring test" (wibble))
+
+       (scene "nested scene"
+              (wrap (let ((z 3)) (run)))
+              (test "using x and z" (check (= (+ x z) 4))))
        )

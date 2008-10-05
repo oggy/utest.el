@@ -40,8 +40,15 @@
 
 ;;;; Test structures ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tester:defstruct scene name wrappers tests)
+(tester:defstruct scene parent name wrappers tests)
 (tester:defstruct test scene name function result)
+
+(defun tester:scene-full-wrapper-list (scene)
+  (let ((wrappers ()))
+    (while scene
+      (setq wrappers (append wrappers (tester:scene-wrappers scene)))
+      (setq scene (tester:scene-parent scene)))
+    wrappers))
 
 (defvar tester:scenes nil
   "List of all test scenes.")
@@ -59,10 +66,11 @@
           forms))
 
 (defmacro scene (name &rest forms)
-  `(tester:define-scene ',name ',forms))
+  `(tester:define-scene nil ',name ',forms))
 
-(defun tester:define-scene (name forms)
+(defun tester:define-scene (parent name forms)
   (let ((scene (tester:make-scene)))
+    (tester:set-scene-parent scene parent)
     (tester:set-scene-name scene name)
     (mapc (lambda (form)
             (case (car form)
@@ -73,6 +81,8 @@
                  (setq function (eval `(lambda () ,@(cddr form))))
                  (tester:set-test-function test function)
                  (tester:add-to-scene-tests scene test)))
+              ('scene
+               (tester:define-scene scene (nth 1 form) (cddr form)))
               ('wrap
                (let ((wrapper (tester:make-wrapper () (cdr form))))
                  (tester:add-to-scene-wrappers scene wrapper)))
@@ -145,7 +155,7 @@ To run the tests from a command line, do:
 (defun tester:run-current-test ()
   (tester:run-current-test-with-wrappers
    (tester:test-function tester:current-test)
-   (reverse (tester:scene-wrappers tester:current-scene)))
+   (reverse (tester:scene-full-wrapper-list tester:current-scene)))
   (unless (tester:test-result tester:current-test)
     (tester:test-passed)))
 

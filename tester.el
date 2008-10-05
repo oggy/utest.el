@@ -1,5 +1,16 @@
 (require 'cl)
 
+;;;; Compatibility ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(if (fboundp 'replace-in-string)
+    ;; XEmacs
+    (defalias 'tester:replace-in-string 'replace-in-string)
+  ;; GNUmacs
+  (defun tester:replace-in-string (target old new &optional literal)
+    "Replace all matches in STR for REGEXP with NEWTEXT string, 
+ and returns the new string."
+    (replace-regexp-in-string old new target nil literal)))
+
 ;;;; Support ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro tester:defstruct (name &rest attributes)
@@ -41,7 +52,7 @@
 ;;;; Test structures ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tester:defstruct scene parent name wrappers tests buffers)
-(tester:defstruct test scene name function result)
+(tester:defstruct test scene name function result error-data)
 
 (defun tester:scene-full-wrapper-list (scene)
   (let ((wrappers ()))
@@ -201,6 +212,7 @@ This runs the tests and prints the results to `standard-output'.
 To run the tests from a command line, do:
 
   emacs -batch -l tester.el -l <test-file> ... -f tester:run"
+  (message "\nRunning tests:")
   (mapc (lambda (tester:current-scene)
           (message "  * %s" (tester:scene-name tester:current-scene))
           (mapc (lambda (tester:current-test)
@@ -225,14 +237,14 @@ To run the tests from a command line, do:
       (tester:call-safely (car tester:wrappers)))))
 
 (defun tester:call-safely (function)
-    (condition-case e
+    (condition-case error-data
         (funcall function)
       (tester:failed
        (unless (tester:test-result tester:current-test)
          (tester:test-failed)))
       (error
        (unless (tester:test-result tester:current-test)
-         (tester:test-erred)))))
+         (tester:test-erred error-data)))))
 
 (defun tester:test-passed ()
   (tester:set-test-result tester:current-test 'pass)
@@ -242,16 +254,27 @@ To run the tests from a command line, do:
   (tester:set-test-result tester:current-test 'fail)
   (message "\e[0;31m    - %s -- FAIL!\e[0m" (tester:test-name tester:current-test)))
 
-(defun tester:test-erred ()
+(defun tester:test-erred (error-data)
   (tester:set-test-result tester:current-test 'error)
+  (tester:set-test-error-data tester:current-test error-data)
   (message "\e[0;31m    - %s -- ERROR!\e[0m" (tester:test-name tester:current-test)))
 
 (defun tester:output-footer ()
-  (message "")
+  (if (> (tester:num-errors) 0)
+      (let ((i 1))
+        (mapc (lambda (test)
+                (when (eq (tester:test-result test) 'error)
+                  (message "\n%d) Error on \"%s\":" i (tester:test-name test))
+                  (message (tester:replace-in-string (format "%s" (tester:test-error-data test))
+                                                     "^" "  "))
+                  (setq i (1+ i))))
+              (tester:all-tests))))
+  (message " ")
   (if (= (tester:num-passed) (tester:num-run))
-      (message "  \e[1;32mAll %s tests passed.\e[0m" (tester:num-passed))
-    (message "  \e[1;31m%s tests failed, %s errors (%s passed).\e[0m"
-             (tester:num-failed) (tester:num-errors) (tester:num-passed))))
+      (message "\e[1;32mAll %s tests passed.\e[0m" (tester:num-passed))
+    (message "\e[1;31m%s tests failed, %s errors (%s passed).\e[0m"
+             (tester:num-failed) (tester:num-errors) (tester:num-passed)))
+)
 
 (defun tester:all-tests ()
   (apply 'append (mapcar 'tester:scene-tests tester:scenes)))

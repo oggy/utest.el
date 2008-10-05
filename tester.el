@@ -204,16 +204,3 @@ To run the tests from a command line, do:
 ;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (provide 'tester)
-
-;;;; Example ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(scene "name of scene"
-       (wrap (run))
-       (wrap (run))
-       (test "passing test" (check t))
-       (test "failing test" (check nil))
-       (test "erring test" (wibble))
-       )
-
-;; To run:
-;;   $ emacs -Q -batch -l tester.el -f tester:run

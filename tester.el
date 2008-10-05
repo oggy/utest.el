@@ -5,11 +5,23 @@
 (if (fboundp 'replace-in-string)
     ;; XEmacs
     (defalias 'tester:replace-in-string 'replace-in-string)
-  ;; GNUmacs
+  ;; GNU Emacs
   (defun tester:replace-in-string (target old new &optional literal)
     "Replace all matches in STR for REGEXP with NEWTEXT string, 
  and returns the new string."
     (replace-regexp-in-string old new target nil literal)))
+
+(if (functionp 'region-exists-p)
+    ;; XEmacs
+    (defalias 'tester:region-exists-p 'region-exists-p)
+  ;; GNU Emacs
+  (defun tester:region-exists-p ()
+    "Return non-nil iff the region is highlighted."
+    (if transient-mark-mode
+        mark-active
+      (condition-case e
+          (mark)
+        (mark-inactive)))))
 
 ;;;; Support ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -167,20 +179,14 @@ defaults to (point-max).
 If either START or END are less than or equal to zero, it means
 that many places from the end of the buffer.  For example, 0
 means (point-max), and -1 means (1- (point-max)).  (Recall that
-the beginning of the buffer is position 1.)
-
-After calling this function, `region-exists-p' will return true.
-Note that when evaluating a call to this function via
-`eval-last-sexp` or similar, the region may not remain
-highlighted, as it is deactivated before `eval-last-sexp`
-returns."
+the beginning of the buffer is position 1.)"
   (when (null start)
     (setq start (point-min)))
   (when (null end)
     (setq end (point-max)))
-  (when (<= 0 start)
+  (when (<= start 0)
     (incf start (point-max)))
-  (when (<= 0 end)
+  (when (<= end 0)
     (incf end (point-max)))
   (set-mark start)
   (goto-char end))

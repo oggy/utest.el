@@ -40,7 +40,7 @@
 
 ;;;; Test structures ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tester:defstruct scene parent name wrappers tests)
+(tester:defstruct scene parent name wrappers tests buffers)
 (tester:defstruct test scene name function result)
 
 (defun tester:scene-full-wrapper-list (scene)
@@ -49,6 +49,13 @@
       (setq wrappers (append wrappers (tester:scene-wrappers scene)))
       (setq scene (tester:scene-parent scene)))
     wrappers))
+
+(defun tester:scene-full-buffer-list (scene)
+  (let ((buffers ()))
+    (while scene
+      (setq buffers (append buffers (tester:scene-buffers scene)))
+      (setq scene (tester:scene-parent scene)))
+    buffers))
 
 (defvar tester:scenes nil
   "List of all test scenes.")
@@ -86,6 +93,8 @@
               ('wrap
                (let ((wrapper (tester:make-wrapper () (cdr form))))
                  (tester:add-to-scene-wrappers scene wrapper)))
+              ('buffers
+               (tester:set-scene-buffers scene (tester:parse-buffers (nth 1 form) (nth 2 form))))
               ('setup
                (let ((wrapper (tester:make-wrapper () (append (copy-list (cdr form)) (list '(run))))))
                  (tester:add-to-scene-wrappers scene wrapper)))
@@ -95,6 +104,40 @@
           forms)
     (add-to-list 'tester:scenes scene)))
 
+(defun tester:parse-buffers (buffers-spec token)
+  (or token (setq token "=="))
+  (let (buffers-alist)
+    (with-temp-buffer
+      (insert buffers-spec)
+      (goto-char (point-min))
+
+      ;; find first token
+      (tester:skip-whitespace)
+      (or (string= token (buffer-substring (point) (+ (point) (length token))))
+          (signal 'tester:invalid-buffer-spec (concat "spec must start with `" token "'")))
+      (forward-char (length token))
+
+      ;; scan the rest
+      (while (not (eobp))
+        (let (name spec)
+          (tester:skip-whitespace)
+          (setq name (intern (buffer-substring (point) (point-at-eol))))
+          (if (eq (forward-line) 0)
+              (let (start end)
+                (setq start (point))
+                (if (search-forward-regexp (concat "^" (regexp-quote token)) nil 'or-goto-eob)
+                    (setq end (match-beginning 0))
+                  (or (eq ?\n (char-before (point)))
+                      (insert "\n"))
+                  (setq end (point)))
+                (setq spec (buffer-substring start end)))
+            (setq spec "\n"))
+          (setq buffers-alist (cons (cons name spec) buffers-alist))))
+      buffers-alist)))
+
+(defun tester:skip-whitespace ()
+  (skip-chars-forward " \t\r\n\f\v"))
+
 ;;;; Test library
 
 (defmacro check (form)
@@ -102,6 +145,7 @@
        (signal 'tester:failed nil)))
 
 (put 'tester:failed 'error-conditions '(tester:failed error))
+(put 'tester:invalid-buffer-spec 'error-conditions '(tester:invalid-buffer-spec error))
 
 (defun tester:select (&optional start end)
   "Highlight the region between START and END in the selected buffer.
@@ -129,6 +173,14 @@ returns."
     (incf end (point-max)))
   (set-mark start)
   (goto-char end))
+
+(defmacro tester:in-buffer (name &rest forms)
+  `(let* ((buffer-alist (tester:scene-full-buffer-list tester:current-scene))
+          (spec (cdr (assoc ',name buffer-alist))))
+     (with-temp-buffer
+       (insert spec)
+       (goto-char (point-min))
+       ,@forms)))
 
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

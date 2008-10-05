@@ -13,4 +13,17 @@
        (scene "nested scene"
               (wrap (let ((z 3)) (run)))
               (test "using x and z" (check (= (+ x z) 4))))
+
+       (test "using buffer one"
+             (tester:in-buffer one
+                               (check (string= (buffer-string) "hi\n"))))
+       (test "using buffer two"
+             (tester:in-buffer two
+                               (check (string= (buffer-string) "bye\n"))))
+       (buffers "
+== one
+hi
+== two
+bye
+")
        )

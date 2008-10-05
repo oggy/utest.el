@@ -139,7 +139,8 @@ To run the tests from a command line, do:
           (mapc (lambda (tester:current-test)
                   (tester:run-current-test))
                 (tester:scene-tests tester:current-scene)))
-        tester:scenes))
+        tester:scenes)
+  (tester:output-footer))
 
 (defun tester:run-current-test ()
   (tester:run-current-test-with-wrappers
@@ -177,6 +178,28 @@ To run the tests from a command line, do:
 (defun tester:test-erred ()
   (tester:set-test-result tester:current-test 'error)
   (message "\e[0;31m    - %s -- ERROR!\e[0m" (tester:test-name tester:current-test)))
+
+(defun tester:output-footer ()
+  (message "")
+  (if (= (tester:num-passed) (tester:num-run))
+      (message "  \e[1;32mAll %s tests passed.\e[0m" (tester:num-passed))
+    (message "  \e[1;31m%s tests failed, %s errors (%s passed).\e[0m"
+             (tester:num-failed) (tester:num-errors) (tester:num-passed))))
+
+(defun tester:all-tests ()
+  (apply 'append (mapcar 'tester:scene-tests tester:scenes)))
+
+(defun tester:num-passed ()
+  (count-if (lambda (test) (eq (tester:test-result test) 'pass)) (tester:all-tests)))
+
+(defun tester:num-failed ()
+  (count-if (lambda (test) (eq (tester:test-result test) 'fail)) (tester:all-tests)))
+
+(defun tester:num-errors ()
+  (count-if (lambda (test) (eq (tester:test-result test) 'error)) (tester:all-tests)))
+
+(defun tester:num-run ()
+  (count-if (lambda (test) (tester:test-result test)) (tester:all-tests)))
 
 ;;;; Provide ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

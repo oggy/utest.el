@@ -16,14 +16,16 @@
 
        (test "using buffer one"
              (tester:in-buffer one
-                               (check (string= (buffer-string) "hi\n"))))
+                               (check (string= (buffer-string) "hi\n"))
+                               (check (= (point) 1))))
        (test "using buffer two"
              (tester:in-buffer two
-                               (check (string= (buffer-string) "bye\n"))))
+                               (check (string= (buffer-string) "bye\n"))
+                               (check (= (point) 4))))
        (buffers "
 == one
 hi
 == two
-bye
+bye-!-
 ")
        )

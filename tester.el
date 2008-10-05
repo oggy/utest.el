@@ -178,8 +178,13 @@ returns."
   `(let* ((buffer-alist (tester:scene-full-buffer-list tester:current-scene))
           (spec (cdr (assoc ',name buffer-alist))))
      (with-temp-buffer
-       (insert spec)
-       (goto-char (point-min))
+       (if (string-match "-!-" spec)
+           (progn
+             (insert (substring spec 0 (match-beginning 0)))
+             (save-excursion
+               (insert (substring spec (match-end 0)))))
+         (insert spec)
+         (goto-char (point-min)))
        ,@forms)))
 
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

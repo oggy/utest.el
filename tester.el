@@ -207,8 +207,8 @@ the beginning of the buffer is position 1.)"
 (defun tester:inspect-buffer ()
   (message (make-string 70 ?=))
   (message "%s-!-%s"
-           (buffer-substring (point-min) (point))
-           (buffer-substring (point) (point-max)))
+           (tester:replace-in-string (buffer-substring (point-min) (point)) "$" "$")
+           (tester:replace-in-string (buffer-substring (point) (point-max)) "$" "$"))
   (message (make-string 70 ?=)))
 
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

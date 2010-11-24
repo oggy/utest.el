@@ -58,33 +58,45 @@
 
 (defun tester:define-adder (struct attribute)
   (let ((adder (intern (concat "tester:add-to-" (symbol-name struct) "-" (symbol-name attribute)))))
-    (eval `(defun ,adder (self value)
-       (puthash ',attribute (cons value (gethash ',attribute self)) self)))))
+    (eval `(defun ,adder (self value &optional append)
+             (let ((list (gethash ',attribute self)))
+               (add-to-list 'list value append)
+               (puthash ',attribute list self))))))
+
+(defun tester:hash-table-keys (table)
+  (let (keys)
+    (maphash (lambda (key value)
+               (setq keys (cons key keys)))
+             table)
+    keys))
 
 ;;;; Test structures ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tester:defstruct scene parent name wrappers tests buffers)
+(tester:defstruct scene parent name wrappers tests strings buffers)
 (tester:defstruct test scene name function result error-data)
+(tester:defstruct buffer string point markers)
 
 (defun tester:scene-full-wrapper-list (scene)
   (let ((wrappers ()))
     (while scene
-      (setq wrappers (append wrappers (tester:scene-wrappers scene)))
+      (setq wrappers (append (tester:scene-wrappers scene) wrappers))
+      (when (> (hash-table-count (tester:scene-strings scene)) 0)
+        (setq wrappers (cons (tester:scene-strings-wrapper scene) wrappers)))
       (setq scene (tester:scene-parent scene)))
     wrappers))
 
-(defun tester:scene-full-buffer-list (scene)
-  (let ((buffers ()))
-    (while scene
-      (setq buffers (append buffers (tester:scene-buffers scene)))
-      (setq scene (tester:scene-parent scene)))
-    buffers))
+(defun tester:scene-strings-wrapper (scene)
+  (let* (bindings)
+    (maphash (lambda (name value)
+               (add-to-list 'bindings (list name value)))
+             (tester:scene-strings scene))
+    (tester:make-wrapper `((let ,bindings (run))))))
 
 (defvar tester:scenes nil
   "List of all test scenes.")
 
-(defun tester:make-wrapper (args forms)
-  (eval `(lambda ,args ,@(tester:expand-run-calls forms))))
+(defun tester:make-wrapper (forms)
+  (eval `(lambda () ,@(tester:expand-run-calls forms))))
 
 (defun tester:expand-run-calls (forms)
   (mapcar (lambda (form)
@@ -99,9 +111,12 @@
   `(tester:define-scene nil ',name ',forms))
 
 (defun tester:define-scene (parent name forms)
-  (let ((scene (tester:make-scene)))
+  (let ((scene (tester:make-scene))
+        subscenes)
     (tester:set-scene-parent scene parent)
     (tester:set-scene-name scene name)
+    (tester:set-scene-strings scene (make-hash-table))
+    (tester:set-scene-buffers scene (make-hash-table))
     (mapc (lambda (form)
             (case (car form)
               ('test
@@ -110,39 +125,45 @@
                  (tester:set-test-name test (nth 1 form))
                  (setq function (eval `(lambda () ,@(cddr form))))
                  (tester:set-test-function test function)
-                 (tester:add-to-scene-tests scene test)))
+                 (tester:add-to-scene-tests scene test t)))
               ('scene
-               (tester:define-scene scene (nth 1 form) (cddr form)))
+               (setq subscenes (cons (cdr form) subscenes)))
               ('wrap
-               (let ((wrapper (tester:make-wrapper () (cdr form))))
-                 (tester:add-to-scene-wrappers scene wrapper)))
+               (let ((wrapper (tester:make-wrapper (cdr form))))
+                 (tester:add-to-scene-wrappers scene wrapper t)))
+              ('strings
+               (tester:set-scene-strings scene (tester:parse-strings (nth 1 form) (nth 2 form))))
               ('buffers
                (tester:set-scene-buffers scene (tester:parse-buffers (nth 1 form) (nth 2 form))))
-              ('setup
-               (let ((wrapper (tester:make-wrapper () (append (copy-list (cdr form)) (list '(run))))))
-                 (tester:add-to-scene-wrappers scene wrapper)))
-              ('teardown
+              ('before
+               (let ((wrapper (tester:make-wrapper (append (copy-list (cdr form)) (list '(run))))))
+                 (tester:add-to-scene-wrappers scene wrapper t)))
+              ('after
                (let ((wrapper (tester:make-wrapper (cons '(run) (copy-list (cdr form))))))
-                 (tester:add-to-scene-wrappers scene wrapper)))))
+                 (tester:add-to-scene-wrappers scene wrapper t)))))
           forms)
-    (add-to-list 'tester:scenes scene)))
+    ;; Define nested scenes after this scene is constructed.
+    (loop for spec in subscenes do
+          (tester:define-scene scene (car spec) (cdr spec)))
+    (add-to-list 'tester:scenes scene t)))
 
-(defun tester:parse-buffers (buffers-spec token)
-  (or token (setq token "=="))
-  (let (buffers-alist)
+(defun tester:parse-strings (spec token)
+  (or token
+      (setq token "=="))
+  (let ((table (make-hash-table)))
     (with-temp-buffer
-      (insert buffers-spec)
+      (insert spec)
       (goto-char (point-min))
 
       ;; find first token
       (tester:skip-whitespace)
       (or (string= token (buffer-substring (point) (+ (point) (length token))))
-          (signal 'tester:invalid-buffer-spec (concat "spec must start with `" token "'")))
+          (signal 'invalid-buffer-spec (concat "spec must start with `" token "'")))
       (forward-char (length token))
 
       ;; scan the rest
       (while (not (eobp))
-        (let (name spec)
+        (let (name value)
           (tester:skip-whitespace)
           (setq name (buffer-substring (point) (point-at-eol)))
           (if (eq (forward-line) 0)
@@ -153,10 +174,35 @@
                   (or (eq ?\n (char-before (point)))
                       (insert "\n"))
                   (setq end (point)))
-                (setq spec (buffer-substring start end)))
-            (setq spec "\n"))
-          (setq buffers-alist (cons (cons name spec) buffers-alist))))
-      buffers-alist)))
+                (setq value (buffer-substring start end)))
+            (setq value "\n"))
+          (puthash (intern name) value table)))
+      table)))
+
+(defun tester:parse-buffers (spec token)
+  (let ((table (tester:parse-strings spec token)))
+    (maphash (lambda (name value)
+               (puthash name (tester:parse-buffer value) table))
+             table)
+    table))
+
+(defun tester:parse-buffer (spec)
+  (let ((buffer (tester:make-buffer)))
+    (tester:set-buffer-markers buffer (make-hash-table))
+    (with-temp-buffer
+      (insert spec)
+      (goto-char (point-min))
+      (while (search-forward-regexp "-\\(!\\|<\\(.*?\\)>\\)-" nil t)
+        (cond
+         ((string= (match-string 1) "!")
+          (delete-region (match-beginning 0) (match-end 0))
+          (tester:set-buffer-point buffer (point)))
+         (t
+          (let ((name (intern (match-string 2))))
+            (delete-region (match-beginning 0) (match-end 0))
+            (puthash name (point) (tester:buffer-markers buffer))))))
+      (tester:set-buffer-string buffer (buffer-string)))
+    buffer))
 
 (defun tester:skip-whitespace ()
   (skip-chars-forward " \t\r\n\f\v"))
@@ -165,10 +211,10 @@
 
 (defmacro check (form)
   `(or ,form
-       (signal 'tester:failed nil)))
+       (signal 'test-failed '(,form))))
 
-(put 'tester:failed 'error-conditions '(tester:failed error))
-(put 'tester:invalid-buffer-spec 'error-conditions '(tester:invalid-buffer-spec error))
+(put 'test-failed 'error-conditions '(test-failed error))
+(put 'invalid-buffer-spec 'error-conditions '(invalid-buffer-spec error))
 
 (defun tester:select (&optional start end)
   "Highlight the region between START and END in the selected buffer.
@@ -191,25 +237,34 @@ the beginning of the buffer is position 1.)"
   (set-mark start)
   (goto-char end))
 
-(defmacro tester:in-buffer (name &rest forms)
-  `(let* ((buffer-alist (tester:scene-full-buffer-list tester:current-scene))
-          (spec (cdr (assoc ',name buffer-alist))))
-     (with-temp-buffer
-       (if (string-match "-!-" spec)
-           (progn
-             (insert (substring spec 0 (match-beginning 0)))
-             (save-excursion
-               (insert (substring spec (match-end 0)))))
-         (insert spec)
-         (goto-char (point-min)))
-       ,@forms)))
+(defmacro in-buffer (name &rest forms)
+  "Run the given forms in the named buffer.
 
-(defun tester:inspect-buffer ()
-  (message (make-string 70 ?=))
-  (message "%s-!-%s"
-           (tester:replace-in-string (buffer-substring (point-min) (point)) "$" "$")
-           (tester:replace-in-string (buffer-substring (point) (point-max)) "$" "$"))
-  (message (make-string 70 ?=)))
+See documentation for `scene' (in particular, the `buffers'
+clause) for information on named buffers.
+
+A fresh buffer is created each time this form is used."
+  (let* ((buffer (or (tester:find-named-buffer tester:current-scene name)
+                     (error (concat "Invalid buffer name: " (symbol-name name)))))
+         (bindings (tester:mapcar-hash (lambda (name value)
+                                         (list name `(set-marker (make-marker) ,value)))
+                                       (tester:buffer-markers buffer))))
+    `(with-temp-buffer
+       (insert ,(tester:buffer-string buffer))
+       (goto-char (or ,(tester:buffer-point buffer) 1))
+       (let (,@bindings) ,@forms))))
+
+(defun tester:find-named-buffer (scene name)
+  (when scene
+    (or (gethash name (tester:scene-buffers tester:current-scene))
+        (tester:find-named-buffer (tester:scene-parent scene) name))))
+
+(defun tester:mapcar-hash (function hash)
+  (let (result)
+    (maphash (lambda (name value)
+               (setq result (cons (funcall function name value) result)))
+             hash)
+    result))
 
 ;;;; Running ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -237,7 +292,7 @@ To run the tests from a command line, do:
 (defun tester:run-current-test ()
   (tester:run-current-test-with-wrappers
    (tester:test-function tester:current-test)
-   (reverse (tester:scene-full-wrapper-list tester:current-scene)))
+   (tester:scene-full-wrapper-list tester:current-scene))
   (unless (tester:test-result tester:current-test)
     (tester:test-passed)))
 
@@ -252,9 +307,9 @@ To run the tests from a command line, do:
 (defun tester:call-safely (function)
     (condition-case error-data
         (funcall function)
-      (tester:failed
+      (test-failed
        (unless (tester:test-result tester:current-test)
-         (tester:test-failed)))
+         (tester:test-failed error-data)))
       (error
        (unless (tester:test-result tester:current-test)
          (tester:test-erred error-data)))))
@@ -263,8 +318,9 @@ To run the tests from a command line, do:
   (tester:set-test-result tester:current-test 'pass)
   (message "    - %s" (tester:test-name tester:current-test)))
 
-(defun tester:test-failed ()
+(defun tester:test-failed (error-data)
   (tester:set-test-result tester:current-test 'fail)
+  (tester:set-test-error-data tester:current-test error-data)
   (message "\e[0;31m    - %s -- FAIL!\e[0m" (tester:test-name tester:current-test)))
 
 (defun tester:test-erred (error-data)
@@ -276,7 +332,7 @@ To run the tests from a command line, do:
   (if (> (tester:num-errors) 0)
       (let ((i 1))
         (mapc (lambda (test)
-                (when (eq (tester:test-result test) 'error)
+                (when (memq (tester:test-result test) '(fail error))
                   (message "\n%d) Error on \"%s\":" i (tester:test-name test))
                   (message (tester:replace-in-string (format "%s" (tester:test-error-data test))
                                                      "^" "  "))

@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+
+class App
+  def run(args)
+    parse_args(args)
+    command = build_command
+    STDERR.puts "++ #{command.map{|s| '"'+s+'"'}.join(' ')}" if @verbose
+    exec *command
+  end
+
+  private
+
+  def initialize
+    @options = {}
+  end
+
+  attr_reader :options
+
+  def parse_args(args)
+    @emacs = find_emacs
+    @load_path = []
+    parser = OptionParser.new do |parser|
+      parser.banner = "Usage: #$0 [options] FILES ..."
+      parser.on('-e', '--emacs PATH', "Path to emacs. Default: #{find_emacs}") { |path| @emacs = path }
+      parser.on('-I', '--include PATH', 'Add PATH to the emacs load path.') { |path| @load_path << path }
+      parser.on('-v', '--verbose', 'Show the emacs invocation.') { @verbose = true }
+    end
+    parser.parse!(args)
+    @files = args
+  end
+
+  def find_emacs
+    paths = [
+      File.expand_path('~/Applications/Aquamacs.app/Contents/MacOS/Aquamacs'),
+      '/Applications/Aquamacs.app/Contents/MacOS/Aquamacs'
+    ]
+    path = paths.find{|path| File.executable?(path)} and
+      return path
+    ENV['PATH'].each do |dir|
+      path = File.expand_path("#{dir}/emacs")
+      return path if File.executable?(path)
+    end
+    # Default fallback.
+    'emacs'
+  end
+
+  def build_command
+    command = [@emacs, '-Q', '-batch']
+    @load_path.each{|dir| command << '-L' << dir}
+    command << '-eval' << "(require 'test)"
+    @files.each{|path| command << '-l' << path}
+    command << '-f' << 'test:run'
+  end
+end
+
+App.new.run(ARGV)

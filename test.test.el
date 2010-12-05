@@ -1,12 +1,33 @@
 (require 'test)
 
+(scene "strings"
+       (test "strings are delimited by headers"
+             (let* ((strings (test:parse-strings "== one\n1\n== two\n2\n" nil)))
+               (check (hash-table-p strings))
+               (check (= (hash-table-count strings) 2))
+               (check (equal (gethash 'one strings) "1\n"))
+               (check (equal (gethash 'two strings) "2\n"))
+               ))
+       (test "strings may be indented"
+             (let* ((strings (test:parse-strings " == one\n 1\n \t== two\n \t2\n \t 2\n" nil)))
+               (check (hash-table-p strings))
+               (check (= (hash-table-count strings) 2))
+               (check (equal (gethash 'one strings) "1\n"))
+               (check (equal (gethash 'two strings) "2\n 2\n")))))
+
 (scene "buffers"
-       (test "buffers may be specified with a buffers form"
+       (test "buffers are delimited by headers"
              (let* ((buffers (test:parse-buffers "== one\n1\n== two\n2\n2\n" nil)))
                (check (hash-table-p buffers))
                (check (= (hash-table-count buffers) 2))
                (check (equal (test:buffer-string (gethash 'one buffers)) "1\n"))
                (check (equal (test:buffer-string (gethash 'two buffers)) "2\n2\n"))))
+       (test "buffers may be indented"
+             (let* ((buffers (test:parse-buffers " == one\n 1\n  == two\n  2\n   2\n" nil)))
+               (check (hash-table-p buffers))
+               (check (= (hash-table-count buffers) 2))
+               (check (equal (test:buffer-string (gethash 'one buffers)) "1\n"))
+               (check (equal (test:buffer-string (gethash 'two buffers)) "2\n 2\n"))))
        (test "point may be specified with '-!-'"
              (let* ((buffers (test:parse-buffers "== name\na-!-b\n" nil))
                     (buffer (gethash 'name buffers)))
@@ -36,9 +57,8 @@
 
 (scene "in-buffer"
        (buffers "
-== one
-a-<marker>-b
-")
+         == one
+         a-<marker>-b")
        (test "switches to a temporary buffer"
              (let ((test-buffer (current-buffer)))
                (in-buffer one
@@ -65,18 +85,18 @@ a-<marker>-b
 (scene "callbacks"
        (scene "outer"
               (before
-               (check (equal values nil))
-               (setq values '(1)))
+                (check (equal values nil))
+                (setq values '(1)))
               (after
-               (check (equal values '(4 3 2 1)))
-               (setq values (cons 5 values)))
+                (check (equal values '(4 3 2 1)))
+                (setq values (cons 5 values)))
               (scene "inner"
                      (before
-                      (check (equal values '(1)))
-                      (setq values (cons 2 values)))
+                       (check (equal values '(1)))
+                       (setq values (cons 2 values)))
                      (after
-                      (check (equal values '(3 2 1)))
-                      (setq values (cons 4 values)))
+                       (check (equal values '(3 2 1)))
+                       (setq values (cons 4 values)))
                      (test "callbacks are run in the correct order when scenes are nested"
                            (check (equal values '(2 1)))
                            (setq values (cons 3 values))))))
@@ -87,13 +107,19 @@ a-<marker>-b
 
 (scene "nested named strings"
        (scene "outer"
-              (strings "== one\n1\n== two\n2")
+              (strings "
+                == one
+                1
+                == two
+                2")
               (before (check (equal one "1\n")))
               (after (check (equal one "1\n")))
               (test "outer strings are available even if overridden in an inner scene"
                     (check (equal one "1\n")))
               (scene "inner"
-                     (strings "== one\n11\n")
+                     (strings "
+                       == one
+                       11")
                      (before (check (equal one "11\n")))
                      (before (check (equal two "2\n")))
                      (test "inner strings override outer ones"

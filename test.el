@@ -150,34 +150,34 @@
 (defun test:parse-strings (spec token)
   (or token
       (setq token "=="))
-  (let ((table (make-hash-table)))
+  (let ((table (make-hash-table))
+        (header-regexp (concat "^\\([ \t]*\\)" (regexp-quote token) " *\\(.*\\)$"))
+        indent-regexp content name value start end)
     (with-temp-buffer
       (insert spec)
+      (when (/= (char-before (point)) ?\n)
+        (insert "\n"))
       (goto-char (point-min))
-
-      ;; find first token
-      (test:skip-whitespace)
-      (or (string= token (buffer-substring (point) (+ (point) (length token))))
-          (signal 'invalid-buffer-spec (concat "spec must start with `" token "'")))
-      (forward-char (length token))
-
-      ;; scan the rest
-      (while (not (eobp))
-        (let (name value)
-          (test:skip-whitespace)
-          (setq name (buffer-substring (point) (point-at-eol)))
-          (if (eq (forward-line) 0)
-              (let (start end)
-                (setq start (point))
-                (if (search-forward-regexp (concat "^" (regexp-quote token)) nil 'or-goto-eob)
-                    (setq end (match-beginning 0))
-                  (or (eq ?\n (char-before (point)))
-                      (insert "\n"))
-                  (setq end (point)))
-                (setq value (buffer-substring start end)))
-            (setq value "\n"))
-          (puthash (intern name) value table)))
-      table)))
+      (while (search-forward-regexp header-regexp nil 'or-goto-eob)
+        (if (null name)
+            ;; First header - check nothing significant before it.
+            (and (string-match "[^ \t\r\n\f\v]" (buffer-substring 1 (match-beginning 0)))
+                 (signal 'invalid-buffer-spec (concat "spec must start with `" token "'")))
+          ;; Not first header - add string.
+          (setq end (match-beginning 0)
+                content (buffer-substring start end)
+                value (replace-regexp-in-string indent-regexp "" content))
+          (puthash (intern name) value table))
+        (setq indent-regexp (concat "^" (regexp-quote (match-string 1)))
+              name (match-string 2)
+              start (1+ (point))))
+      ;; Add last string.
+      (when name
+        (setq end (point)
+              content (buffer-substring start end)
+              value (replace-regexp-in-string indent-regexp "" content))
+        (puthash (intern name) (if (string= value "") "\n" value) table)))
+    table))
 
 (defun test:parse-buffers (spec token)
   (let ((table (test:parse-strings spec token)))
@@ -203,9 +203,6 @@
             (puthash name (point) (test:buffer-markers buffer))))))
       (test:set-buffer-string buffer (buffer-string)))
     buffer))
-
-(defun test:skip-whitespace ()
-  (skip-chars-forward " \t\r\n\f\v"))
 
 ;;;; Test library
 

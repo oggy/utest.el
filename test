@@ -68,7 +68,12 @@ class App
   end
 
   def bootstrap_code
-    dir = File.expand_path(File.dirname(__FILE__))
+    me = File.expand_path(__FILE__)
+    while File.symlink?(me)
+      target = File.readlink(me)
+      me = File.expand_path(target, File.dirname(me))
+    end
+    dir = File.dirname(me)
 
     # If we can't find test.el on the load path, try looking relative
     # to this script.

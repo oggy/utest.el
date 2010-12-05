@@ -75,10 +75,11 @@
 (scene "selecting a region"
        (test "select-region selects a region"
              (with-temp-buffer
+               (transient-mark-mode 1)
                (insert (make-string 10 ?-))
-               (check (not (test:region-exists-p)))
+               (check (not mark-active))
                (select-region)
-               (check (test:region-exists-p))))
+               (check mark-active)))
 )
 
 (defvar values nil)

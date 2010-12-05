@@ -11,18 +11,6 @@
  and returns the new string."
     (replace-regexp-in-string old new target nil literal)))
 
-(if (functionp 'region-exists-p)
-    ;; XEmacs
-    (defalias 'test:region-exists-p 'region-exists-p)
-  ;; GNU Emacs
-  (defun test:region-exists-p ()
-    "Return non-nil iff the region is highlighted."
-    (if transient-mark-mode
-        mark-active
-      (condition-case e
-          (mark)
-        (mark-inactive)))))
-
 ;;;; Support ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro test:defstruct (name &rest attributes)

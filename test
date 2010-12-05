@@ -28,30 +28,57 @@ class App
       parser.on('-v', '--verbose', 'Show the emacs invocation.') { @verbose = true }
     end
     parser.parse!(args)
+    find_real_emacs
     @files = args
   end
 
   def find_emacs
-    paths = [
-      File.expand_path('~/Applications/Aquamacs.app/Contents/MacOS/Aquamacs'),
-      '/Applications/Aquamacs.app/Contents/MacOS/Aquamacs'
-    ]
-    path = paths.find{|path| File.executable?(path)} and
-      return path
-    ENV['PATH'].each do |dir|
-      path = File.expand_path("#{dir}/emacs")
-      return path if File.executable?(path)
+    emacs = ENV['EMACS'] and
+      return emacs
+
+    ['~/Applications', '/Applications'].each do |app_path|
+      ['Aquamacs.app/Contents/MacOS/Aquamacs', 'Aquamacs Emacs.app/Contents/MacOS/Aquamacs Emacs'].each do |executable_path|
+        path = File.expand_path("#{app_path}/#{executable_path}")
+        return path if File.exist?(path)
+      end
     end
-    # Default fallback.
+
     'emacs'
+  end
+
+  def find_real_emacs
+    # If the root of an Aquamacs bundle was given, find the emacs inside.
+    if File.directory?(@emacs) && @emacs =~ /\.app\/*\z/
+      ['Contents/MacOS/Aquamacs', 'Contents/MacOS/Aquamacs Emacs'].each do |path|
+        path = "#@emacs/#{path}"
+        if File.exist?(path)
+          @emacs = path
+          break
+        end
+      end
+    end
   end
 
   def build_command
     command = [@emacs, '-Q', '-batch']
     @load_path.each{|dir| command << '-L' << dir}
-    command << '-eval' << "(require 'test)"
+    command << '-eval' << bootstrap_code
     @files.each{|path| command << '-l' << path}
     command << '-f' << 'test:run'
+  end
+
+  def bootstrap_code
+    dir = File.expand_path(File.dirname(__FILE__))
+
+    # If we can't find test.el on the load path, try looking relative
+    # to this script.
+    <<-EOS.gsub(/\s+/m, ' ').strip
+      (progn
+        (condition-case tester:data
+            (require 'test)
+          (file-error
+            (load "#{dir.gsub(/"/, '\\\&')}/test" nil t))))
+    EOS
   end
 end
 

@@ -140,32 +140,46 @@
       (setq token "=="))
   (let ((table (make-hash-table))
         (header-regexp (concat "^\\([ \t]*\\)" (regexp-quote token) " *\\(.*\\)$"))
-        indent-regexp content name value start end)
+        start
+        (end (make-marker))
+        indent name value)
     (with-temp-buffer
       (insert spec)
       (when (/= (char-before (point)) ?\n)
         (insert "\n"))
       (goto-char (point-min))
-      (while (search-forward-regexp header-regexp nil 'or-goto-eob)
+      (while (search-forward-regexp header-regexp nil 'or-goto-end)
         (if (null name)
             ;; First header - check nothing significant before it.
             (and (string-match "[^ \t\r\n\f\v]" (buffer-substring 1 (match-beginning 0)))
-                 (signal 'invalid-buffer-spec (concat "spec must start with `" token "'")))
+                 (signal 'invalid-buffer-spec (concat "missing `" token "' header")))
           ;; Not first header - add string.
-          (setq end (match-beginning 0)
-                content (buffer-substring start end)
-                value (replace-regexp-in-string indent-regexp "" content))
+          (set-marker end (match-beginning 0))
+          (test:remove-indent start end indent)
+          (setq value (buffer-substring start end))
           (puthash (intern name) value table))
-        (setq indent-regexp (concat "^" (regexp-quote (match-string 1)))
-              name (match-string 2)
+        (setq name (match-string 2)
+              indent (match-string 1)
               start (1+ (point))))
       ;; Add last string.
       (when name
-        (setq end (point)
-              content (buffer-substring start end)
-              value (replace-regexp-in-string indent-regexp "" content))
+        (test:remove-indent start (point) indent)
+        (setq value (buffer-substring start (point)))
         (puthash (intern name) (if (string= value "") "\n" value) table)))
+    (set-marker end nil)
     table))
+
+(defun test:remove-indent (start end indent)
+  (unless (string= indent "")
+    (let ((regexp (concat "^" (regexp-quote indent)))
+          (end-marker (make-marker)))
+      (set-marker end-marker end)
+      (save-excursion
+        (save-match-data
+          (goto-char start)
+          (while (search-forward-regexp regexp end-marker t)
+            (delete-region (match-beginning 0) (match-end 0)))))
+      (set-marker end-marker nil))))
 
 (defun test:parse-buffers (spec token)
   (let ((table (test:parse-strings spec token)))

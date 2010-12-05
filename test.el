@@ -216,7 +216,7 @@
 (put 'test-failed 'error-conditions '(test-failed error))
 (put 'invalid-buffer-spec 'error-conditions '(invalid-buffer-spec error))
 
-(defun test:select (&optional start end)
+(defun select-region (&optional start end)
   "Highlight the region between START and END in the selected buffer.
 
 If START is nil, it defaults to (point-min); if END is nil, it

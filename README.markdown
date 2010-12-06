@@ -1,4 +1,4 @@
-## test.el
+## utest.el
 
 Emacs lisp unit testing DSL. Cross-emacs compatible. Runnable from
 command line.
@@ -13,7 +13,7 @@ In mylib.el:
 In mylib.test.el:
 
     (require 'mylib)
-    (require 'test)
+    (require 'utest)
 
     (scene "add"
       (test "returns the sum of two positive integers"
@@ -23,20 +23,20 @@ In mylib.test.el:
 
 On the command line:
 
-    $ /path/to/test-el -I /path/to/mylib mylib.test.el
+    $ utest -I /path/to/mylib mylib.test.el
 
-`test-el` exits with non-zero status if and only if any tests fail.
-It is compatible with GNU Emacs, Aquamacs, and XEmacs; you may specify
-an emacs binary with `-e`. Great for automation and continuous
+`utest` exits with non-zero status if and only if any tests fail.  It
+is compatible with GNU Emacs, Aquamacs, and XEmacs; you may specify an
+emacs binary with `-e`. Great for automation and continuous
 integration.
 
-The `test.el` library is searched for in the emacs load path, and in
-the directory that `test-el` lives in. You may expand the load path
-with `-I`. Run with `--help` for more options.
+The `utest.el` library is searched for in the emacs load path, and in
+the directory that `utest` lives in. You may expand the load path with
+`-I`. Run with `--help` for more options.
 
 ## Digging Deeper
 
-test.el provides a rich DSL for common testing scenarios. **Tests**
+utest.el provides a rich DSL for common testing scenarios. **Tests**
 are grouped into nestable **scenes**. Here's what you can do with
 them.
 
@@ -124,8 +124,8 @@ Typically, `start` and `end` are markers in a named buffer (see
 
 ## Note on Patches/Pull Requests
 
- * Bug reports: http://github.com/oggy/test.el/issues
- * Source: http://github.com/oggy/test.el
+ * Bug reports: http://github.com/oggy/utest.el/issues
+ * Source: http://github.com/oggy/utest.el
  * Patches: Fork on Github, send pull request.
    * Ensure patch includes tests.
 

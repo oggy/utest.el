@@ -64,7 +64,7 @@ class App
     @load_path.each{|dir| command << '-L' << dir}
     command << '-eval' << bootstrap_code
     @files.each{|path| command << '-l' << path}
-    command << '-f' << 'test:run'
+    command << '-f' << 'utest:run'
   end
 
   def bootstrap_code
@@ -75,14 +75,14 @@ class App
     end
     dir = File.dirname(me)
 
-    # If we can't find test.el on the load path, try looking relative
+    # If we can't find utest.el on the load path, try looking relative
     # to this script.
     <<-EOS.gsub(/\s+/m, ' ').strip
       (progn
-        (condition-case tester:data
-            (require 'test)
+        (condition-case utest:data
+            (require 'utest)
           (file-error
-            (load "#{dir.gsub(/"/, '\\\&')}/test" nil t))))
+            (load "#{dir.gsub(/"/, '\\\&')}/utest" nil t))))
     EOS
   end
 end

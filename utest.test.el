@@ -1,15 +1,15 @@
-(require 'test)
+(require 'utest)
 
 (scene "strings"
        (test "strings are delimited by headers"
-             (let* ((strings (test:parse-strings "== one\n1\n== two\n2\n" nil)))
+             (let* ((strings (utest:parse-strings "== one\n1\n== two\n2\n" nil)))
                (check (hash-table-p strings))
                (check (= (hash-table-count strings) 2))
                (check (equal (gethash 'one strings) "1\n"))
                (check (equal (gethash 'two strings) "2\n"))
                ))
        (test "strings may be indented"
-             (let* ((strings (test:parse-strings " == one\n 1\n \t== two\n \t2\n \t 2\n" nil)))
+             (let* ((strings (utest:parse-strings " == one\n 1\n \t== two\n \t2\n \t 2\n" nil)))
                (check (hash-table-p strings))
                (check (= (hash-table-count strings) 2))
                (check (equal (gethash 'one strings) "1\n"))
@@ -17,43 +17,43 @@
 
 (scene "buffers"
        (test "buffers are delimited by headers"
-             (let* ((buffers (test:parse-buffers "== one\n1\n== two\n2\n2\n" nil)))
+             (let* ((buffers (utest:parse-buffers "== one\n1\n== two\n2\n2\n" nil)))
                (check (hash-table-p buffers))
                (check (= (hash-table-count buffers) 2))
-               (check (equal (test:buffer-string (gethash 'one buffers)) "1\n"))
-               (check (equal (test:buffer-string (gethash 'two buffers)) "2\n2\n"))))
+               (check (equal (utest:buffer-string (gethash 'one buffers)) "1\n"))
+               (check (equal (utest:buffer-string (gethash 'two buffers)) "2\n2\n"))))
        (test "buffers may be indented"
-             (let* ((buffers (test:parse-buffers " == one\n 1\n  == two\n  2\n   2\n" nil)))
+             (let* ((buffers (utest:parse-buffers " == one\n 1\n  == two\n  2\n   2\n" nil)))
                (check (hash-table-p buffers))
                (check (= (hash-table-count buffers) 2))
-               (check (equal (test:buffer-string (gethash 'one buffers)) "1\n"))
-               (check (equal (test:buffer-string (gethash 'two buffers)) "2\n 2\n"))))
+               (check (equal (utest:buffer-string (gethash 'one buffers)) "1\n"))
+               (check (equal (utest:buffer-string (gethash 'two buffers)) "2\n 2\n"))))
        (test "point may be specified with '-!-'"
-             (let* ((buffers (test:parse-buffers "== name\na-!-b\n" nil))
+             (let* ((buffers (utest:parse-buffers "== name\na-!-b\n" nil))
                     (buffer (gethash 'name buffers)))
-               (check (= (test:buffer-point buffer) 2))
-               (check (equal (test:buffer-string buffer) "ab\n"))))
+               (check (= (utest:buffer-point buffer) 2))
+               (check (equal (utest:buffer-string buffer) "ab\n"))))
        (test "markers may be specified with '-<NAME>-'"
-             (let* ((buffers (test:parse-buffers "== name\na-<first>-b-<second>-c\n" nil))
+             (let* ((buffers (utest:parse-buffers "== name\na-<first>-b-<second>-c\n" nil))
                     (buffer (gethash 'name buffers))
-                    (markers (test:buffer-markers buffer))
+                    (markers (utest:buffer-markers buffer))
                     (first (gethash 'first markers))
                     (second (gethash 'second markers)))
                (check (= first 2))
                (check (= second 3))
-               (check (equal (test:buffer-string buffer) "abc\n"))))
+               (check (equal (utest:buffer-string buffer) "abc\n"))))
        (test "omitting the body creates a buffer with a newline"
-             (let* ((buffers (test:parse-buffers "== name" nil))
+             (let* ((buffers (utest:parse-buffers "== name" nil))
                     (buffer (gethash 'name buffers)))
-               (check (equal (test:buffer-string buffer) "\n"))))
+               (check (equal (utest:buffer-string buffer) "\n"))))
        (test "a trailing newline is added if none is given"
-             (let* ((buffers (test:parse-buffers "== name\nx" nil))
+             (let* ((buffers (utest:parse-buffers "== name\nx" nil))
                     (buffer (gethash 'name buffers)))
-               (check (equal  (test:buffer-string buffer) "x\n"))))
+               (check (equal  (utest:buffer-string buffer) "x\n"))))
        (test "the token may be specified with a second argument"
-             (let* ((buffers (test:parse-buffers "@@ name\nx\n" "@@"))
+             (let* ((buffers (utest:parse-buffers "@@ name\nx\n" "@@"))
                     (buffer (gethash 'name buffers)))
-               (check (equal (test:buffer-string buffer) "x\n")))))
+               (check (equal (utest:buffer-string buffer) "x\n")))))
 
 (scene "in-buffer"
        (buffers "
